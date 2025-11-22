@@ -112,8 +112,8 @@ class TwoPhaseCommitServicer(twopc_pb2_grpc.TwoPhaseCommitServiceServicer):
     def SendDecision(self, request, context):
         """
         Participant receives final decision from Coordinator.
-        In a shared database architecture, participants don't commit - only validate.
-        The coordinator is responsible for the actual commit to the shared database.
+        Each node has its own database replica. Participants commit to their
+        local replica when they receive GlobalCommit.
         """
         tx_id = request.transaction_id
         coordinator_id = request.coordinator_id
@@ -130,11 +130,12 @@ class TwoPhaseCommitServicer(twopc_pb2_grpc.TwoPhaseCommitServiceServicer):
             
             try:
                 if commit:
-                    # Acknowledge the commit decision (coordinator already committed to shared DB)
-                    print(f"Phase DECISION of Node {self.node_id} acknowledges commit for transaction {tx_id}")
+                    # Commit to this node's local replica
+                    self.commit_fn(tx_data['operation'], tx_data['payload'])
+                    print(f"Phase DECISION of Node {self.node_id} committed transaction {tx_id} to local replica")
                     success = True
                 else:
-                    # Execute abort/cleanup if needed
+                    # Execute abort/cleanup
                     self.abort_fn(tx_data['operation'], tx_data['payload'])
                     print(f"Phase DECISION of Node {self.node_id} aborted transaction {tx_id}")
                     success = True
@@ -170,8 +171,8 @@ class TwoPhaseCommitCoordinator:
     def execute_2pc(self, operation: str, payload: Dict) -> Tuple[bool, str]:
         """
         Execute 2PC protocol as coordinator.
-        Since all nodes share Redis, only the coordinator commits to the database.
-        Other nodes participate in voting only.
+        Each node has its own database replica. The coordinator commits locally,
+        then instructs all participants to commit to their replicas.
         
         Returns:
             Tuple of (success: bool, message: str)
@@ -188,13 +189,13 @@ class TwoPhaseCommitCoordinator:
         all_commit = all(vote for vote in votes.values()) if votes else True
         
         if all_commit:
-            # All peers voted to commit, now commit locally (coordinator only commits)
+            # All peers voted to commit, now commit to coordinator's replica
             try:
                 from main import commit_operation
                 commit_operation(operation, payload)
-                print(f"Phase DECISION of Node {self.node_id} committed transaction {tx_id}")
+                print(f"Phase DECISION of Node {self.node_id} committed transaction {tx_id} to local replica")
                 
-                # Inform all peers of the decision
+                # Inform all peers to commit to their replicas
                 self._decision_phase(tx_id, True, peers)
                 return True, f"Transaction {tx_id} committed successfully"
             except Exception as e:

@@ -91,6 +91,13 @@ def validate_operation(operation: str, payload: dict) -> bool:
             queue = get_queue()
             return any(t.id == track_id for t in queue)
         
+        elif operation == "play_next":
+            queue = get_queue()
+            return len(queue) > 0  # Queue must have at least one track
+        
+        elif operation == "clear":
+            return True  # Always allow clear
+        
         return True
     except Exception as e:
         print(f"[ERROR] Validation error: {e}")
@@ -121,6 +128,20 @@ def commit_operation(operation: str, payload: dict):
                 t.votes += 1 if up else -1
         queue.sort(key=lambda x: (-x.votes, x.id))
         set_queue(queue)
+    
+    elif operation == "play_next":
+        track_data = payload['track']
+        track = Track(**track_data)
+        queue = get_queue()
+        # Remove first track and add to history
+        if queue and queue[0].id == track.id:
+            queue.pop(0)
+            set_queue(queue)
+            add_to_history(track)
+    
+    elif operation == "clear":
+        redis_client.delete(QUEUE_KEY)
+        redis_client.delete(HISTORY_KEY)
 
 
 def abort_operation(operation: str, payload: dict):
@@ -228,11 +249,17 @@ def play_next():
     queue = get_queue()
     if not queue:
         raise HTTPException(status_code=400, detail="Queue empty")
-    track = queue.pop(0)
-    set_queue(queue)
-    add_to_history(track)
-    # No 2PC needed for play_next as it's a read operation followed by local state change
-    return {"now_playing": track}
+    track = queue[0]  # Get first track without removing yet
+    
+    # Use 2PC to move track from queue to history on all replicas
+    payload = {"track": track.dict()}
+    success, message = coordinator.execute_2pc("play_next", payload)
+    
+    if success:
+        # Transaction committed via 2PC on all nodes
+        return {"now_playing": track}
+    else:
+        raise HTTPException(status_code=400, detail=message)
 
 
 @app.get("/history")
@@ -254,6 +281,9 @@ def sync_queue(new_queue: List[Track]):
 # Test utility endpoint to clear queue and history (for test isolation)
 @app.post("/clear")
 def clear_all():
-    redis_client.delete(QUEUE_KEY)
-    redis_client.delete(HISTORY_KEY)
-    return {"message": "Queue and history cleared"}
+    # Use 2PC to clear all replicas consistently
+    success, message = coordinator.execute_2pc("clear", {})
+    if success:
+        return {"message": "Queue and history cleared"}
+    else:
+        return {"message": message}

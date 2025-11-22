@@ -18,10 +18,21 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - node
-  redis:
+  # Each node gets its own Redis replica
+  redis-1:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
+  redis-2:
+    image: redis:7-alpine
+    restart: unless-stopped
+  redis-3:
+    image: redis:7-alpine
+    restart: unless-stopped
+  redis-4:
+    image: redis:7-alpine
+    restart: unless-stopped
+  redis-5:
+    image: redis:7-alpine
     restart: unless-stopped
   test-runner:
     build:
