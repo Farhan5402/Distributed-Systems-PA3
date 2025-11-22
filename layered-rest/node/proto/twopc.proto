@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package twopc;
+
+// Vote phase messages
+message VoteRequest {
+    string transaction_id = 1;
+    string operation = 2;  // e.g., "add_track", "remove_track", "vote"
+    string payload = 3;    // JSON-encoded operation data
+    string coordinator_id = 4;
+}
+
+message VoteResponse {
+    string transaction_id = 1;
+    string participant_id = 2;
+    bool vote_commit = 3;  // true = VoteCommit, false = VoteAbort
+    string reason = 4;     // Optional reason for abort
+}
+
+// Decision phase messages
+message GlobalDecision {
+    string transaction_id = 1;
+    bool commit = 2;  // true = GlobalCommit, false = GlobalAbort
+    string coordinator_id = 3;
+}
+
+message DecisionAck {
+    string transaction_id = 1;
+    string participant_id = 2;
+    bool success = 3;
+}
+
+// 2PC Service
+service TwoPhaseCommitService {
+    // Coordinator -> Participant: Request vote
+    rpc RequestVote (VoteRequest) returns (VoteResponse);
+    
+    // Coordinator -> Participant: Send final decision
+    rpc SendDecision (GlobalDecision) returns (DecisionAck);
+}
