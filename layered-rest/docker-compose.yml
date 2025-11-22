@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/queue"]
-      interval: 10s
+      interval: 30s  # Reduced frequency: every 30 seconds instead of 10
       timeout: 3s
       retries: 3
       start_period: 10s
