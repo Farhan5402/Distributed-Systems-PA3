@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package raft;
+
+// RequestVote RPC for leader election
+message VoteRequest {
+    int32 term = 1;              // candidate's term
+    string candidate_id = 2;      // candidate requesting vote
+    int32 last_log_index = 3;     // index of candidate's last log entry
+    int32 last_log_term = 4;      // term of candidate's last log entry
+}
+
+message VoteResponse {
+    int32 term = 1;               // current term, for candidate to update itself
+    bool vote_granted = 2;        // true means candidate received vote
+    string voter_id = 3;          // ID of the node that voted
+}
+
+// AppendEntries RPC for log replication and heartbeat
+message LogEntry {
+    int32 term = 1;               // term when entry was received by leader
+    int32 index = 2;              // index in the log
+    string operation = 3;         // operation type (e.g., "add_track", "vote")
+    string payload = 4;           // JSON-encoded operation data
+}
+
+message AppendEntriesRequest {
+    int32 term = 1;               // leader's term
+    string leader_id = 2;         // so follower can redirect clients
+    int32 prev_log_index = 3;     // index of log entry immediately preceding new ones
+    int32 prev_log_term = 4;      // term of prev_log_index entry
+    repeated LogEntry entries = 5; // log entries to store (empty for heartbeat)
+    int32 leader_commit = 6;      // leader's commit_index
+}
+
+message AppendEntriesResponse {
+    int32 term = 1;               // current term, for leader to update itself
+    bool success = 2;             // true if follower contained entry matching prev_log_index and prev_log_term
+    string follower_id = 3;       // ID of the responding follower
+    int32 match_index = 4;        // index of last matching log entry
+}
+
+// Raft service definition
+service RaftService {
+    // Leader election RPC
+    rpc RequestVote (VoteRequest) returns (VoteResponse);
+    
+    // Log replication and heartbeat RPC
+    rpc AppendEntries (AppendEntriesRequest) returns (AppendEntriesResponse);
+}

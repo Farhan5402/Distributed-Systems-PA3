@@ -2,3 +2,6 @@ fastapi
 uvicorn
 requests
 redis
+grpcio
+grpcio-tools
+protobuf
