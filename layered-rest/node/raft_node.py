@@ -74,7 +74,10 @@ class RaftNode:
         self.last_applied = 0  # Index of highest log entry applied to state machine
         
         # Restore last_applied from persistent storage if available
-        if self.get_last_applied_fn:
+        # NOTE: We only restore last_applied if the log is non-empty, since the log is in-memory
+        # and will be rebuilt from the leader. If we restore last_applied when log is empty,
+        # we won't be able to re-apply the entries we receive from the leader.
+        if self.get_last_applied_fn and len(self.log) > 0:
             try:
                 self.last_applied = self.get_last_applied_fn()
                 print(f"[RAFT] Node {self.node_id} restored last_applied = {self.last_applied}")

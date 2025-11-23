@@ -350,9 +350,11 @@ docker logs raft-node-1 2>&1 | grep -E "(replicated|entries)" | tail -10
 
 ---
 
-## 📋 DEMO PART 4: Automated Tests (Q5) - 2 Minutes
+## 📋 DEMO PART 4: Automated Tests (Q5) - 3 Minutes
 
-**Say:** "Finally, let me run some of the automated test cases that verify the implementation."
+**Say:** "Finally, let me run the 5 automated test cases that verify the implementation meets all requirements."
+
+**Note:** Tests 2 and 4 require Docker access to stop/start containers, so they run from the host. Tests 1, 3, and 5 run inside the test-runner container.
 
 ### Test 1: Leader Election Test
 
@@ -363,26 +365,82 @@ docker exec raft-test-runner python3 /app/tests/test_raft_leader_election.py
 
 **Expected:** `✓ Test PASSED: Exactly 1 leader elected`
 
-### Test 2: Log Replication Test
+**Point out:**
+> "This test verifies that exactly one leader is elected and all other nodes are followers, satisfying Q3's leader election requirement."
+
+### Test 2: Leader Failure & Re-election Test
+
+**Note:** This test requires Docker access, so it must run from the host, not inside a container.
 
 ```bash
-echo "=== Test 2: Log Replication ==="
+echo "=== Test 2: Leader Failure ==="
+cd /Users/farhan121/code-uta/sem1/cse5306/Project\ Assignment\ 3/Distributed-Systems-PA3/layered-rest
+python3 tests/test_raft_leader_failure.py
+```
+
+**Expected:** `✓ Test PASSED: New leader elected after failure`
+
+**Point out:**
+> "This test kills the current leader and verifies that a new leader is automatically elected within a few seconds, demonstrating fault tolerance. Note that we already demonstrated this manually in Part 1."
+
+**Alternative (if Python not available on host):**
+Skip this test during the demo since you already manually demonstrated leader failure and re-election in Part 1.3. Simply say:
+> "Test 2 validates leader failure and re-election, which we already demonstrated manually in Part 1 when we killed the leader and observed automatic re-election."
+
+### Test 3: Log Replication Test
+
+```bash
+echo "=== Test 3: Log Replication ==="
 docker exec raft-test-runner python3 /app/tests/test_raft_log_replication.py
 ```
 
 **Expected:** `✓ Test PASSED: All nodes have identical logs`
 
-### Test 3: Consistency Test
+**Point out:**
+> "This test adds multiple entries and verifies they're replicated identically across all 5 nodes, satisfying Q4's log replication requirement."
+
+### Test 4: Follower Recovery Test
+
+**Note:** This test requires Docker access, so it must run from the host, not inside a container.
 
 ```bash
-echo "=== Test 3: Consistency Test ==="
+echo "=== Test 4: Follower Recovery ==="
+cd /Users/farhan121/code-uta/sem1/cse5306/Project\ Assignment\ 3/Distributed-Systems-PA3/layered-rest
+python3 tests/test_raft_follower_recovery.py
+```
+
+**Expected:** `✓ Test PASSED: Follower caught up successfully`
+
+**Point out:**
+> "This test simulates a 'new node entering the cluster' by stopping a follower, adding data, then restarting it and verifying it catches up. This satisfies Q5's requirement for a new node test."
+
+**Alternative (if Python not available on host):**
+Skip this test and reference the manual demonstration in Part 3. Simply say:
+> "Test 4 validates follower catch-up after restart, which we demonstrated in Part 3 when we added a new node and it automatically synced with the cluster."
+
+### Test 5: Consistency Test
+
+```bash
+echo "=== Test 5: Consistency Under Concurrent Operations ==="
 docker exec raft-test-runner python3 /app/tests/test_raft_consistency.py
 ```
 
 **Expected:** `✓ Test PASSED: Consistent state across all nodes`
 
 **Point out:**
-> "All tests pass, demonstrating that the implementation correctly handles leader election, log replication, and maintains consistency across the cluster."
+> "This test performs concurrent write operations and verifies all nodes maintain consistency - no node has divergent state."
+
+---
+
+**Summary:**
+> "All 5 tests pass, demonstrating that the implementation correctly handles:
+> 1. Leader election (Q3)
+> 2. Leader failure and automatic re-election (Q3)
+> 3. Log replication across all nodes (Q4)
+> 4. Follower recovery / new node joining (Q5)
+> 5. Consistency under concurrent operations (Q4 + Q5)
+>
+> This provides comprehensive coverage of all Raft requirements."
 
 ---
 
@@ -484,9 +542,9 @@ A: Not recommended for strong consistency (may return stale data). For lineariza
 | 4:00  | Q4-1 | Add tracks, verify replication across all nodes |
 | 6:00  | Q4-2 | Show request forwarding from follower |
 | 7:00  | Recovery | Stop follower, add data, restart, verify catch-up |
-| 9:30  | Q5 | Run 2-3 automated tests |
-| 11:00 | Q&A | Answer TA questions |
-| 12:00 | Done | ✅ |
+| 9:30  | Q5 | Run all 5 automated tests |
+| 11:30 | Q&A | Answer TA questions |
+| 12:30 | Done | ✅ |
 
 ---
 
@@ -549,7 +607,7 @@ During demo, confirm:
 - [ ] Log replication visible across all nodes
 - [ ] Request forwarding from follower works
 - [ ] Follower recovery/catch-up works
-- [ ] At least 2 automated tests pass
+- [ ] All 5 automated tests pass
 
 ---
 
