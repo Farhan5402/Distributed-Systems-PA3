@@ -172,7 +172,7 @@ def apply_committed_operation(operation: str, payload: dict):
 def submit_to_raft(operation: str, payload: dict) -> bool:
     """
     Submit an operation to the Raft log.
-    If this node is not the leader, return False.
+    If this node is not the leader, auto-forward to leader.
     If leader, submit and wait for commit.
     """
     global raft_node
@@ -182,19 +182,57 @@ def submit_to_raft(operation: str, payload: dict) -> bool:
     
     if not raft_node.is_leader():
         leader = raft_node.get_leader()
-        if leader:
-            raise HTTPException(
-                status_code=307,
-                detail=f"Not the leader. Current leader is {leader}",
-                headers={"X-Leader-Id": leader}
-            )
-        else:
+        if not leader:
             raise HTTPException(
                 status_code=503,
                 detail="No leader available. Election in progress."
             )
+        
+        # Auto-forward to leader
+        try:
+            # Get leader's HTTP port (node-1=8001, node-2=8002, etc.)
+            leader_num = leader.split('-')[1]
+            leader_port = 8000 + int(leader_num)
+            
+            # Construct URL - leader is already hostname (e.g., "node-2")
+            # In Docker network, can reach node-2:8000 directly
+            leader_url = f"http://{leader}:8000"
+            
+            print(f"[FORWARD] Non-leader forwarding {operation} to leader {leader} at {leader_url}")
+            
+            # Determine endpoint from operation
+            endpoint_map = {
+                "add_track": "/add_track",
+                "remove_track": "/remove_track", 
+                "vote": "/vote"
+            }
+            endpoint = endpoint_map.get(operation, f"/{operation}")
+            
+            # Forward the request to the leader
+            response = requests.post(
+                f"{leader_url}{endpoint}",
+                json=payload,
+                timeout=10,
+                headers={"X-Forwarded-By": raft_node.node_id}
+            )
+            
+            # If successful, the leader has committed the operation
+            # We can return success without re-submitting
+            if response.status_code == 200:
+                print(f"[FORWARD] Successfully forwarded to leader, operation committed")
+                return True
+            else:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Leader returned error: {response.text}"
+                )
+        except requests.exceptions.RequestException as e:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Failed to forward to leader {leader}: {str(e)}"
+            )
     
-    # Submit to Raft
+    # This node is the leader - submit to Raft
     success = raft_node.submit_operation(operation, payload, timeout=10.0)
     
     if not success:
