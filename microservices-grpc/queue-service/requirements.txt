@@ -1,4 +1,0 @@
-# requirements.txt for gRPC queue service
-grpcio
-grpcio-tools
-redis

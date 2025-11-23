@@ -38,11 +38,12 @@ services:
     build:
       context: ./node
     environment:
-      - API_URL=http://node:8000/queue
+      - API_URL=http://nginx:8080
     depends_on:
       - node
       - nginx
     volumes:
-      - ./tests:/app
-      - ./node/test-runner.sh:/app/test-runner.sh:ro
-    entrypoint: ["/bin/sh", "/app/test-runner.sh"]
+      - ./tests:/app/tests
+    working_dir: /app/tests
+    entrypoint: ["/bin/sh", "-c", "sleep infinity"]
+    restart: unless-stopped
