@@ -30,11 +30,32 @@ message DecisionAck {
     bool success = 3;
 }
 
-// 2PC Service
-service TwoPhaseCommitService {
-    // Coordinator -> Participant: Request vote
+// Intra-node communication messages (Voting Phase -> Decision Phase)
+message VotingResult {
+    string transaction_id = 1;
+    string operation = 2;
+    string payload = 3;
+    bool all_voted_commit = 4;
+    string coordinator_id = 5;
+}
+
+message DecisionCommand {
+    string transaction_id = 1;
+    bool commit = 2;
+    string message = 3;
+}
+
+// Voting Phase Service (runs on port 50051)
+service VotingPhaseService {
+    // Inter-node: Coordinator -> Participant voting request
     rpc RequestVote (VoteRequest) returns (VoteResponse);
-    
-    // Coordinator -> Participant: Send final decision
+}
+
+// Decision Phase Service (runs on port 50052)
+service DecisionPhaseService {
+    // Inter-node: Coordinator -> Participant decision
     rpc SendDecision (GlobalDecision) returns (DecisionAck);
+    
+    // Intra-node: Voting Phase -> Decision Phase (within same container)
+    rpc ExecuteDecision (VotingResult) returns (DecisionCommand);
 }

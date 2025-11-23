@@ -1,15 +1,74 @@
 services:
-  node:
+  node-1:
     build: ./node
-    deploy:
-      replicas: 5
+    container_name: layered-rest-node-1
+    environment:
+      - NODE_ID=1
+      - REDIS_HOST=redis-1
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/queue"]
-      interval: 30s  # Reduced frequency: every 30 seconds instead of 10
+      interval: 30s
       timeout: 3s
       retries: 3
       start_period: 10s
+  
+  node-2:
+    build: ./node
+    container_name: layered-rest-node-2
+    environment:
+      - NODE_ID=2
+      - REDIS_HOST=redis-2
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/queue"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+  
+  node-3:
+    build: ./node
+    container_name: layered-rest-node-3
+    environment:
+      - NODE_ID=3
+      - REDIS_HOST=redis-3
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/queue"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+  
+  node-4:
+    build: ./node
+    container_name: layered-rest-node-4
+    environment:
+      - NODE_ID=4
+      - REDIS_HOST=redis-4
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/queue"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+  
+  node-5:
+    build: ./node
+    container_name: layered-rest-node-5
+    environment:
+      - NODE_ID=5
+      - REDIS_HOST=redis-5
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/queue"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+  
   nginx:
     image: nginx:alpine
     ports:
@@ -17,7 +76,11 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - node
+      - node-1
+      - node-2
+      - node-3
+      - node-4
+      - node-5
   # Each node gets its own Redis replica
   redis-1:
     image: redis:7-alpine
@@ -40,7 +103,11 @@ services:
     environment:
       - API_URL=http://nginx:8080
     depends_on:
-      - node
+      - node-1
+      - node-2
+      - node-3
+      - node-4
+      - node-5
       - nginx
     volumes:
       - ./tests:/app/tests

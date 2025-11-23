@@ -14,9 +14,10 @@ from typing import List
 # Add proto to path for generated files
 sys.path.insert(0, '/app/proto')
 
-# Import 2PC components
-from twopc_service import TwoPhaseCommitServicer, TwoPhaseCommitCoordinator
-import twopc_pb2_grpc
+# Import 2PC components - new separate phase services
+from voting_phase_service import start_voting_phase_server
+from decision_phase_service import start_decision_phase_server
+from coordinator import TwoPhaseCommitCoordinator
 
 
 # Redis connection
@@ -152,27 +153,33 @@ def abort_operation(operation: str, payload: dict):
 
 
 # Initialize 2PC gRPC server
-def start_grpc_server():
-    """Start the gRPC server for 2PC communication."""
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    servicer = TwoPhaseCommitServicer(
-        validate_fn=validate_operation,
-        commit_fn=commit_operation,
-        abort_fn=abort_operation
+def start_grpc_servers():
+    """Start both Voting Phase and Decision Phase gRPC servers."""
+    # Start Voting Phase server on port 50051
+    voting_server, voting_servicer = start_voting_phase_server(
+        validate_fn=validate_operation
     )
-    twopc_pb2_grpc.add_TwoPhaseCommitServiceServicer_to_server(servicer, server)
-    server.add_insecure_port('[::]:50051')
-    server.start()
-    print("[2PC] gRPC server started on port 50051")
-    server.wait_for_termination()
+    print("[2PC] Voting Phase gRPC server started on port 50051")
+    
+    # Start Decision Phase server on port 50052 (with reference to voting phase)
+    decision_server, decision_servicer = start_decision_phase_server(
+        commit_fn=commit_operation,
+        abort_fn=abort_operation,
+        voting_servicer=voting_servicer
+    )
+    print("[2PC] Decision Phase gRPC server started on port 50052")
+    
+    # Keep both servers running
+    voting_server.wait_for_termination()
+    decision_server.wait_for_termination()
 
 
 @app.on_event("startup")
 async def startup_event():
-    """Start gRPC server in background thread when FastAPI starts."""
-    grpc_thread = threading.Thread(target=start_grpc_server, daemon=True)
+    """Start both phase gRPC servers in background thread when FastAPI starts."""
+    grpc_thread = threading.Thread(target=start_grpc_servers, daemon=True)
     grpc_thread.start()
-    print("[2PC] Background gRPC server thread started")
+    print("[2PC] Background gRPC servers thread started (Voting: 50051, Decision: 50052)")
 
 
 def broadcast_queue():

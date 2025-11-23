@@ -11,5 +11,5 @@ COPY . .
 RUN python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/twopc.proto
 
 RUN chmod +x /app/entrypoint.sh
-EXPOSE 8000 50051
+EXPOSE 8000 50051 50052
 ENTRYPOINT ["/app/entrypoint.sh"]

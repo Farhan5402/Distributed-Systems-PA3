@@ -6,7 +6,7 @@ set -x
 # Usage:
 # - Discovers peer containers by their hostnames and excludes self
 # - Sets PEER_NODES environment variable with comma-separated HTTP URLs
-# - Assigns each node to its own Redis replica based on container order
+# - Uses NODE_ID environment variable to determine Redis replica
 
 # Wait for DNS to propagate
 sleep 2
@@ -17,34 +17,32 @@ SELF_HOSTNAME=$(hostname)
 # Discover all containers in the same service by resolving the service name
 # and building peer list excluding self
 if [ -z "$PEER_NODES" ]; then
-  # Get all IP addresses for the 'node' service
-  PEER_IPS=$(getent hosts node | awk '{print $1}' | sort -u)
-  SELF_IP=$(hostname -i)
+  # NODE_ID should be set by docker-compose.yml
+  if [ -z "$NODE_ID" ]; then
+    echo "[entrypoint] ERROR: NODE_ID not set!"
+    exit 1
+  fi
   
-  # Determine which Redis replica this node should use
-  # by finding this node's position in the sorted list
-  NODE_INDEX=1
-  CURRENT_INDEX=1
-  for ip in $PEER_IPS; do
-    if [ "$ip" = "$SELF_IP" ]; then
-      NODE_INDEX=$CURRENT_INDEX
-      break
-    fi
-    CURRENT_INDEX=$((CURRENT_INDEX + 1))
-  done
+  # REDIS_HOST should also be set by docker-compose.yml
+  if [ -z "$REDIS_HOST" ]; then
+    export REDIS_HOST="redis-$NODE_ID"
+  fi
   
-  # Set REDIS_HOST to the corresponding redis instance
-  export REDIS_HOST="redis-$NODE_INDEX"
-  echo "[entrypoint] Assigned to REDIS_HOST: $REDIS_HOST"
+  echo "[entrypoint] NODE_ID: $NODE_ID"
+  echo "[entrypoint] REDIS_HOST: $REDIS_HOST"
   
-  # Build comma-separated list of peer URLs (HTTP for REST API)
+  # Build peer list by checking all possible nodes (1-5)
   PEER_LIST=""
-  for ip in $PEER_IPS; do
-    if [ "$ip" != "$SELF_IP" ]; then
-      if [ -z "$PEER_LIST" ]; then
-        PEER_LIST="http://$ip:8000"
-      else
-        PEER_LIST="$PEER_LIST,http://$ip:8000"
+  for i in 1 2 3 4 5; do
+    if [ "$i" != "$NODE_ID" ]; then
+      # Check if the node is reachable
+      if getent hosts "node-$i" >/dev/null 2>&1; then
+        NODE_IP=$(getent hosts "node-$i" | awk '{print $1}' | head -1)
+        if [ -z "$PEER_LIST" ]; then
+          PEER_LIST="http://$NODE_IP:8000"
+        else
+          PEER_LIST="$PEER_LIST,http://$NODE_IP:8000"
+        fi
       fi
     fi
   done
