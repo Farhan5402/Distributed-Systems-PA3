@@ -158,6 +158,15 @@ curl -s http://localhost:$OLD_LEADER_PORT/raft/status | jq '{node_id, state, ter
 
 ## 📋 DEMO PART 2: Log Replication (Q4) - 4 Minutes
 
+**⚠️ IMPORTANT: Clear Previous Data First**
+
+```bash
+# Clear any existing data from previous demonstrations
+curl -s -X POST http://localhost:8001/clear
+sleep 2
+echo "Queue cleared. Starting fresh."
+```
+
 ### 2.1 Find Current Leader
 
 ```bash

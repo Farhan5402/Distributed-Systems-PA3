@@ -68,6 +68,12 @@ Expected output should show one leader and four followers:
 
 All five required tests are included. Tests 1, 3, and 5 run inside the test-runner container. Tests 2 and 4 require Docker access and must run from the host.
 
+**⚠️ IMPORTANT**: Clear the queue before running tests to avoid duplicate data:
+```bash
+curl -s -X POST http://localhost:8001/clear
+sleep 2
+```
+
 ### Test 1: Leader Election ✅
 
 Verifies exactly one leader is elected and all others are followers.
